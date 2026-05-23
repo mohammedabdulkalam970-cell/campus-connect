@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiPlus, FiX, FiTag } from 'react-icons/fi';
 import { useDropzone } from 'react-dropzone';
+import { addDoc, collection, serverTimestamp, updateDoc, doc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import useFirestore from '../hooks/useFirestore';
 import useStorage from '../hooks/useStorage';
-import { addDocument, updateDocument } from '../firebase/firestore';
+import { db } from '../firebase';
 import LostItemCard from '../components/LostItemCard';
 import SearchBar from '../components/SearchBar';
 import SkeletonLoader from '../components/SkeletonLoader';
@@ -45,11 +46,12 @@ const LostFound = () => {
             if (imageFile) {
                 imageURL = await upload(imageFile, `lostfound/${currentUser.uid}/${Date.now()}_${imageFile.name}`);
             }
-            await addDocument('lostfound', {
+            await addDoc(collection(db, 'lostfound'), {
                 ...form,
                 imageURL,
                 uploadedBy: currentUser.uid,
                 uploaderName: userProfile?.name || 'Student',
+                createdAt: serverTimestamp(),
             });
             toast.success(`${form.status} item posted!`);
             setShowPost(false);
@@ -60,7 +62,7 @@ const LostFound = () => {
 
     const handleResolve = async (id) => {
         try {
-            await updateDocument('lostfound', id, { status: 'resolved' });
+            await updateDoc(doc(db, 'lostfound', id), { status: 'resolved', updatedAt: serverTimestamp() });
             toast.success('Marked as resolved!');
         } catch { toast.error('Failed to update status'); }
     };

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { uploadFile } from '../firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { storage } from '../firebase';
 
 /**
  * Hook to upload a file to Firebase Storage with progress tracking
@@ -15,7 +16,28 @@ const useStorage = () => {
         setError(null);
         setProgress(0);
         try {
-            const downloadURL = await uploadFile(file, path, (p) => setProgress(p));
+            const storageRef = ref(storage, path);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            const downloadURL = await new Promise((resolve, reject) => {
+                uploadTask.on(
+                    'state_changed',
+                    (snapshot) => {
+                        const pct = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        setProgress(Math.round(pct));
+                    },
+                    (err) => reject(err),
+                    async () => {
+                        try {
+                            const result = await getDownloadURL(storageRef);
+                            resolve(result);
+                        } catch (err) {
+                            reject(err);
+                        }
+                    },
+                );
+            });
+
             setUrl(downloadURL);
             return downloadURL;
         } catch (err) {

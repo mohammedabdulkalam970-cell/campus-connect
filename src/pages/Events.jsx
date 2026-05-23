@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiPlus, FiX, FiCalendar } from 'react-icons/fi';
+import { addDoc, collection, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import useFirestore from '../hooks/useFirestore';
-import { addDocument, deleteDocument } from '../firebase/firestore';
+import { db } from '../firebase';
 import EventCard from '../components/EventCard';
 import SearchBar from '../components/SearchBar';
 import SkeletonLoader from '../components/SkeletonLoader';
@@ -31,7 +32,10 @@ const Events = () => {
         ev.preventDefault();
         if (!form.title || !form.date || !form.venue) return toast.error('Fill required fields');
         try {
-            await addDocument('events', form);
+            await addDoc(collection(db, 'events'), {
+                ...form,
+                createdAt: serverTimestamp(),
+            });
             toast.success('Event created!');
             setShowAdd(false);
             setForm({ title: '', description: '', venue: '', date: '', category: 'Technical', registrationLink: '', posterURL: '' });

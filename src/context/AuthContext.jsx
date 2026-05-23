@@ -1,8 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthChange } from '../firebase/auth';
-import { auth } from '../firebase/config';
-import { getDocument } from '../firebase/firestore';
+import { auth } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const AuthContext = createContext(null);
 
@@ -12,23 +11,18 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthChange(async (user) => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setCurrentUser(user);
+
             if (user) {
-                try {
-                    const profile = await getDocument('users', user.uid);
-                    setUserProfile(profile);
-                } catch {
-                    setUserProfile(null);
-                }
+                setUserProfile(user);
             } else {
                 setUserProfile(null);
             }
-            setLoading(false);
-        }, (error) => {
-            console.error("Auth error:", error);
+
             setLoading(false);
         });
+
         return unsubscribe;
     }, []);
 
@@ -43,7 +37,11 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
     const context = useContext(AuthContext);
-    if (!context) throw new Error('useAuth must be used within AuthProvider');
+
+    if (!context) {
+        throw new Error('useAuth must be used within AuthProvider');
+    }
+
     return context;
 };
 

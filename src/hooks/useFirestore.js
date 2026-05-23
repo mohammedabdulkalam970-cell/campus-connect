@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { subscribeToCollection } from '../firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { db } from "../firebase";
 
 /**
  * Subscribe to a Firestore collection in real-time
@@ -13,13 +14,27 @@ const useFirestore = (collectionName, conditions = [], ordering = null) => {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
         try {
-            const unsubscribe = subscribeToCollection(collectionName, (data) => {
-                setDocs(data);
+            let q = collection(db, collectionName);
+            const constraints = [];
+
+            conditions.forEach((condition) => {
+                constraints.push(where(condition.field, condition.operator, condition.value));
+            });
+
+            if (ordering) {
+                constraints.push(orderBy(ordering.field, ordering.direction || 'asc'));
+            }
+
+            const unsubscribe = onSnapshot(query(q, ...constraints), (snapshot) => {
+                setDocs(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
                 setLoading(false);
-            }, conditions, ordering);
+            }, (err) => {
+                setError(err.message);
+                setLoading(false);
+            });
+
             return unsubscribe;
         } catch (err) {
             setError(err.message);

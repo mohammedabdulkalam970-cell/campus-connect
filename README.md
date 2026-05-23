@@ -37,7 +37,7 @@ npm install
 
 1. Create a project at [Firebase Console](https://console.firebase.google.com)
 2. Enable: **Authentication**, **Firestore**, **Storage**, **Realtime Database**
-3. Copy your config into `src/firebase/config.js`
+3. Copy your config into `src/firebase.js`
 
 ### 3. Firestore Security Rules
 

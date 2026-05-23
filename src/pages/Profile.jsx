@@ -1,10 +1,11 @@
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { FiEdit2, FiSave, FiCamera, FiBook, FiCalendar, FiMail, FiPhone, FiHash } from 'react-icons/fi';
+import { updateProfile } from 'firebase/auth';
+import { setDoc, doc } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { auth, db, storage } from '../firebase';
 import { useAuth } from '../context/AuthContext';
-import { setDocument } from '../firebase/firestore';
-import { uploadFile, getProfilePath } from '../firebase/storage';
-import { updateUserProfile } from '../firebase/auth';
 import useFirestore from '../hooks/useFirestore';
 import NoteCard from '../components/NoteCard';
 import toast from 'react-hot-toast';
@@ -28,8 +29,8 @@ const Profile = () => {
         if (!form.name) return toast.error('Name is required');
         setSaving(true);
         try {
-            await setDocument('users', currentUser.uid, form);
-            await updateUserProfile(form.name, userProfile?.profileImage || '');
+            await setDoc(doc(db, 'users', currentUser.uid), form, { merge: true });
+            await updateProfile(auth.currentUser, { displayName: form.name });
             setUserProfile(p => ({ ...p, ...form }));
             setEditing(false);
             toast.success('Profile updated!');
@@ -42,10 +43,25 @@ const Profile = () => {
         if (!file) return;
         setUploadingAvatar(true);
         try {
-            const path = getProfilePath(currentUser.uid, file.name);
-            const url = await uploadFile(file, path, () => { });
-            await setDocument('users', currentUser.uid, { profileImage: url });
-            await updateUserProfile(displayName, url);
+            const path = `profiles/${currentUser.uid}/${Date.now()}_${file.name}`;
+            const storageRef = ref(storage, path);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+            const url = await new Promise((resolve, reject) => {
+                uploadTask.on(
+                    'state_changed',
+                    () => { },
+                    (err) => reject(err),
+                    async () => {
+                        try {
+                            resolve(await getDownloadURL(storageRef));
+                        } catch (err) {
+                            reject(err);
+                        }
+                    },
+                );
+            });
+            await setDoc(doc(db, 'users', currentUser.uid), { profileImage: url }, { merge: true });
+            await updateProfile(auth.currentUser, { photoURL: url });
             setUserProfile(p => ({ ...p, profileImage: url }));
             toast.success('Profile picture updated!');
         } catch { toast.error('Upload failed'); }

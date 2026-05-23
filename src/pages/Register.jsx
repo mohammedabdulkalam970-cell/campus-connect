@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiUser, FiMail, FiLock, FiPhone, FiHash, FiEye, FiEyeOff } from 'react-icons/fi';
-import { signUp, updateUserProfile } from '../firebase/auth';
-import { setDocument } from '../firebase/firestore';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { setDoc, doc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 import toast from 'react-hot-toast';
 
 const departments = ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'IT', 'MBA', 'MCA'];
@@ -54,9 +55,9 @@ const Register = () => {
 
         setLoading(true);
         try {
-            const { user } = await signUp(form.email, form.password);
-            await updateUserProfile(form.name, '');
-            await setDocument('users', user.uid, {
+            const { user } = await createUserWithEmailAndPassword(auth, form.email, form.password);
+            await updateProfile(user, { displayName: form.name });
+            await setDoc(doc(db, 'users', user.uid), {
                 name: form.name,
                 email: form.email,
                 collegeId: form.collegeId,

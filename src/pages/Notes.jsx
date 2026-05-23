@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiUpload, FiFilter, FiX } from 'react-icons/fi';
 import { useDropzone } from 'react-dropzone';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import useFirestore from '../hooks/useFirestore';
 import useStorage from '../hooks/useStorage';
-import { addDocument } from '../firebase/firestore';
-import { getFilePath } from '../firebase/storage';
+import { db } from '../firebase';
 import NoteCard from '../components/NoteCard';
 import SearchBar from '../components/SearchBar';
 import SkeletonLoader from '../components/SkeletonLoader';
@@ -52,9 +52,9 @@ const Notes = () => {
         try {
             const ext = file.name.split('.').pop().toLowerCase();
             const fileType = ext === 'pdf' ? 'pdf' : ['jpg', 'jpeg', 'png'].includes(ext) ? 'image' : 'doc';
-            const path = getFilePath('notes', uploadForm.department.toLowerCase(), uploadForm.semester, file.name);
+            const path = `notes/${uploadForm.department.toLowerCase()}/${uploadForm.semester}/${Date.now()}_${file.name}`;
             const fileURL = await upload(file, path);
-            await addDocument('notes', {
+            await addDoc(collection(db, 'notes'), {
                 ...uploadForm,
                 fileURL,
                 fileType,
@@ -62,6 +62,7 @@ const Notes = () => {
                 uploaderName: userProfile?.name || 'Student',
                 likes: [],
                 saves: [],
+                createdAt: serverTimestamp(),
             });
             toast.success('Notes uploaded successfully! 🎉');
             setShowUpload(false);
