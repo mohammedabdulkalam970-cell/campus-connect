@@ -1,5 +1,7 @@
 import { useState } from 'react';
+
 import { Link, useNavigate } from 'react-router-dom';
+
 import { motion } from 'framer-motion';
 
 import {
@@ -9,7 +11,9 @@ import {
     FiEyeOff
 } from 'react-icons/fi';
 
-import { signIn } from "../firebase";
+import {
+    signIn
+} from "../firebase";
 
 import toast from 'react-hot-toast';
 
@@ -31,16 +35,34 @@ const Login = () => {
         e.preventDefault();
 
         if (!form.email || !form.password) {
-            return toast.error('Please fill all fields');
+
+            return toast.error(
+                'Please fill all fields'
+            );
+
+        }
+
+        // ONLY NECN EMAILS
+        if (!form.email.endsWith("@necn.ac.in")) {
+
+            return toast.error(
+                "Only NECN college emails are allowed"
+            );
+
         }
 
         setLoading(true);
 
         try {
 
-            await signIn(form.email, form.password);
+            await signIn(
+                form.email,
+                form.password
+            );
 
-            toast.success('Welcome back! 👋');
+            toast.success(
+                'Welcome back! 👋'
+            );
 
             navigate('/dashboard');
 
@@ -48,7 +70,25 @@ const Login = () => {
 
             console.error(err);
 
-            toast.error('Login failed');
+            const messages = {
+
+                'auth/user-not-found':
+                    'No account found with this email',
+
+                'auth/wrong-password':
+                    'Incorrect password',
+
+                'auth/invalid-credential':
+                    'Invalid email or password',
+
+                'auth/too-many-requests':
+                    'Too many attempts. Try later.'
+
+            };
+
+            toast.error(
+                messages[err.code] || 'Login failed'
+            );
 
         } finally {
 
@@ -59,6 +99,7 @@ const Login = () => {
     };
 
     return (
+
         <div className="min-h-screen gradient-brand flex items-center justify-center p-4 relative overflow-hidden">
 
             <div className="absolute top-0 left-0 w-96 h-96 bg-cyan-400/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
@@ -74,9 +115,11 @@ const Login = () => {
                 >
 
                     <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl">
+
                         <span className="text-blue-700 font-black text-2xl">
                             CC
                         </span>
+
                     </div>
 
                     <h1 className="text-2xl font-black text-white">
@@ -100,7 +143,10 @@ const Login = () => {
                         Sign In
                     </h2>
 
-                    <form onSubmit={handleLogin} className="space-y-4">
+                    <form
+                        onSubmit={handleLogin}
+                        className="space-y-4"
+                    >
 
                         <div className="relative">
 
@@ -108,7 +154,7 @@ const Login = () => {
 
                             <input
                                 type="email"
-                                placeholder="College Email"
+                                placeholder="NECN College Email"
                                 value={form.email}
                                 onChange={(e) =>
                                     setForm((p) => ({
@@ -140,7 +186,9 @@ const Login = () => {
 
                             <button
                                 type="button"
-                                onClick={() => setShowPw((p) => !p)}
+                                onClick={() =>
+                                    setShowPw((p) => !p)
+                                }
                                 className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/80"
                             >
 
@@ -188,7 +236,9 @@ const Login = () => {
             </div>
 
         </div>
+
     );
+
 };
 
 export default Login;

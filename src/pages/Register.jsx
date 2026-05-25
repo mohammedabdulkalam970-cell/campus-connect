@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+
 import {
     FiUser,
     FiMail,
@@ -13,7 +14,9 @@ import {
 
 import {
     createUserWithEmailAndPassword,
-    updateProfile
+    updateProfile,
+    sendEmailVerification,
+    signOut
 } from 'firebase/auth';
 
 import {
@@ -135,10 +138,6 @@ const Register = () => {
             return 'Passwords do not match';
         }
 
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-            return 'Invalid email';
-        }
-
         return null;
     };
 
@@ -150,11 +149,6 @@ const Register = () => {
 
         if (err) {
             return toast.error(err);
-        }
-
-        // NECN EMAIL RESTRICTION
-        if (!form.email.endsWith("@necn.ac.in")) {
-            return toast.error("Only NECN college emails are allowed");
         }
 
         setLoading(true);
@@ -172,7 +166,14 @@ const Register = () => {
                 displayName: form.name
             });
 
+            // SEND VERIFICATION EMAIL
+            await sendEmailVerification(user);
+
+            console.log("Verification email sent");
+
+            // SAVE USER DATA
             await setDoc(doc(db, 'users', user.uid), {
+
                 name: form.name,
                 email: form.email,
                 collegeId: form.collegeId,
@@ -182,23 +183,38 @@ const Register = () => {
                 profileImage: '',
                 role: 'student',
                 uid: user.uid,
+                verified: false
+
             });
 
-            toast.success('NECN account created successfully 🎉');
+            // FORCE LOGOUT
+            await signOut(auth);
 
-            navigate('/dashboard');
+            toast.success(
+                'Verification email sent 📧 Check Inbox/Spam'
+            );
+
+            setTimeout(() => {
+
+                navigate('/login');
+
+            }, 3000);
 
         } catch (err) {
 
+            console.error(err);
+
             const messages = {
+
                 'auth/email-already-in-use':
-                    'An account already exists with this email.',
+                    'Email already exists',
 
                 'auth/invalid-email':
                     'Invalid email address',
 
                 'auth/weak-password':
-                    'Password is too weak',
+                    'Weak password'
+
             };
 
             toast.error(
@@ -214,6 +230,7 @@ const Register = () => {
     };
 
     return (
+
         <div className="min-h-screen gradient-brand flex items-center justify-center p-4 relative overflow-hidden">
 
             <div className="absolute top-0 left-0 w-96 h-96 bg-cyan-400/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
@@ -229,9 +246,11 @@ const Register = () => {
                 >
 
                     <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-xl">
+
                         <span className="text-blue-700 font-black text-xl">
                             CC
                         </span>
+
                     </div>
 
                     <h1 className="text-2xl font-black text-white">
@@ -239,7 +258,7 @@ const Register = () => {
                     </h1>
 
                     <p className="text-blue-200 text-sm">
-                        Create your NECN student account
+                        Create your student account
                     </p>
 
                 </motion.div>
@@ -259,6 +278,7 @@ const Register = () => {
                         <div className="grid grid-cols-2 gap-3">
 
                             <div className="col-span-2">
+
                                 <Field
                                     icon={FiUser}
                                     name="name"
@@ -266,17 +286,20 @@ const Register = () => {
                                     value={form.name}
                                     onChange={set}
                                 />
+
                             </div>
 
                             <div className="col-span-2">
+
                                 <Field
                                     icon={FiMail}
                                     name="email"
                                     type="email"
-                                    placeholder="NECN College Email *"
+                                    placeholder="Email *"
                                     value={form.email}
                                     onChange={set}
                                 />
+
                             </div>
 
                             <Field
@@ -303,21 +326,22 @@ const Register = () => {
                             onChange={(e) =>
                                 set('department', e.target.value)
                             }
-                            className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-white/30 transition-all text-sm"
+                            className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white"
                         >
 
-                            <option value="" className="text-slate-900 bg-white">
+                            <option value="">
                                 Select Department *
                             </option>
 
                             {departments.map((d) => (
+
                                 <option
                                     key={d}
                                     value={d}
-                                    className="text-slate-900 bg-white"
                                 >
                                     {d}
                                 </option>
+
                             ))}
 
                         </select>
@@ -327,21 +351,22 @@ const Register = () => {
                             onChange={(e) =>
                                 set('year', e.target.value)
                             }
-                            className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-white/30 transition-all text-sm"
+                            className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white"
                         >
 
-                            <option value="" className="text-slate-900 bg-white">
+                            <option value="">
                                 Select Year *
                             </option>
 
                             {years.map((y) => (
+
                                 <option
                                     key={y}
                                     value={y}
-                                    className="text-slate-900 bg-white"
                                 >
                                     {y}
                                 </option>
+
                             ))}
 
                         </select>
@@ -349,7 +374,7 @@ const Register = () => {
                         <Field
                             icon={FiLock}
                             name="password"
-                            placeholder="Password (min 6 chars) *"
+                            placeholder="Password *"
                             value={form.password}
                             onChange={set}
                             showPw={showPw}
@@ -379,8 +404,8 @@ const Register = () => {
                         >
 
                             {loading
-                                ? 'Creating NECN Account...'
-                                : 'Create NECN Account →'
+                                ? 'Creating Account...'
+                                : 'Create Account →'
                             }
 
                         </motion.button>
@@ -405,7 +430,9 @@ const Register = () => {
             </div>
 
         </div>
+
     );
+
 };
 
 export default Register;
