@@ -12,8 +12,11 @@ import {
 } from 'react-icons/fi';
 
 import {
-    signIn
-} from "../firebase";
+    signInWithEmailAndPassword,
+    signOut
+} from 'firebase/auth';
+
+import { auth } from '../firebase';
 
 import toast from 'react-hot-toast';
 
@@ -55,10 +58,24 @@ const Login = () => {
 
         try {
 
-            await signIn(
-                form.email,
-                form.password
-            );
+            const userCredential =
+                await signInWithEmailAndPassword(
+                    auth,
+                    form.email,
+                    form.password
+                );
+
+            // EMAIL VERIFICATION CHECK
+            if (!userCredential.user.emailVerified) {
+
+                await signOut(auth);
+
+                toast.error(
+                    "Please verify your email first 📧"
+                );
+
+                return;
+            }
 
             toast.success(
                 'Welcome back! 👋'

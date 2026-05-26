@@ -1,224 +1,137 @@
 import { useState } from 'react';
+
 import { Link, useNavigate } from 'react-router-dom';
+
 import { motion } from 'framer-motion';
 
 import {
     FiUser,
     FiMail,
     FiLock,
-    FiPhone,
-    FiHash,
     FiEye,
     FiEyeOff
 } from 'react-icons/fi';
 
 import {
     createUserWithEmailAndPassword,
-    updateProfile,
     sendEmailVerification,
     signOut
 } from 'firebase/auth';
 
-import {
-    setDoc,
-    doc
-} from 'firebase/firestore';
-
 import { auth, db } from '../firebase';
+
+import {
+    doc,
+    setDoc
+} from 'firebase/firestore';
 
 import toast from 'react-hot-toast';
 
-const departments = [
-    'CSE',
-    'ECE',
-    'EEE',
-    'MECH',
-    'CIVIL',
-    'IT',
-    'MBA',
-    'MCA'
-];
-
-const years = [
-    '1st Year',
-    '2nd Year',
-    '3rd Year',
-    '4th Year'
-];
-
-const Field = ({
-    icon: Icon,
-    name,
-    type = 'text',
-    placeholder,
-    value,
-    onChange,
-    showPw,
-    onTogglePw
-}) => (
-
-    <div className="relative">
-
-        <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 w-4 h-4" />
-
-        <input
-            type={
-                name === 'password' || name === 'confirm'
-                    ? (showPw ? 'text' : 'password')
-                    : type
-            }
-            placeholder={placeholder}
-            value={value}
-            onChange={(e) => onChange(name, e.target.value)}
-            className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all text-sm"
-        />
-
-        {(name === 'password' || name === 'confirm') && (
-            <button
-                type="button"
-                onClick={onTogglePw}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/80"
-            >
-
-                {showPw
-                    ? <FiEyeOff className="w-4 h-4" />
-                    : <FiEye className="w-4 h-4" />
-                }
-
-            </button>
-        )}
-
-    </div>
-
-);
-
 const Register = () => {
 
-    const [form, setForm] = useState({
-        name: '',
-        email: '',
-        password: '',
-        confirm: '',
-        collegeId: '',
-        department: '',
-        year: '',
-        phone: '',
-    });
+    const navigate = useNavigate();
 
     const [showPw, setShowPw] = useState(false);
 
     const [loading, setLoading] = useState(false);
 
-    const navigate = useNavigate();
-
-    const set = (k, v) =>
-        setForm((p) => ({
-            ...p,
-            [k]: v
-        }));
-
-    const validate = () => {
-
-        if (
-            !form.name ||
-            !form.email ||
-            !form.password ||
-            !form.collegeId ||
-            !form.department ||
-            !form.year
-        ) {
-            return 'Please fill all required fields';
-        }
-
-        if (form.password.length < 6) {
-            return 'Password must be at least 6 characters';
-        }
-
-        if (form.password !== form.confirm) {
-            return 'Passwords do not match';
-        }
-
-        return null;
-    };
+    const [form, setForm] = useState({
+        name: '',
+        email: '',
+        password: ''
+    });
 
     const handleRegister = async (e) => {
 
         e.preventDefault();
 
-        const err = validate();
+        if (
+            !form.name ||
+            !form.email ||
+            !form.password
+        ) {
 
-        if (err) {
-            return toast.error(err);
+            return toast.error(
+                'Please fill all required fields'
+            );
+
+        }
+
+        // TEMPORARY REMOVE NECN CHECK FOR TESTING
+        /*
+        if (
+            !form.email.endsWith('@necn.ac.in')
+        ) {
+
+            return toast.error(
+                'Only NECN emails allowed'
+            );
+
+        }
+        */
+
+        if (form.password.length < 6) {
+
+            return toast.error(
+                'Password must be at least 6 characters'
+            );
+
         }
 
         setLoading(true);
 
         try {
 
-            const { user } =
+            console.log("CREATING USER...");
+
+            const userCredential =
                 await createUserWithEmailAndPassword(
                     auth,
                     form.email,
                     form.password
                 );
 
-            await updateProfile(user, {
-                displayName: form.name
-            });
+            console.log("USER CREATED");
 
-            // SEND VERIFICATION EMAIL
-            await sendEmailVerification(user);
+            // SEND EMAIL VERIFICATION
+            console.log("SENDING EMAIL...");
 
-            console.log("Verification email sent");
+            await sendEmailVerification(
+                userCredential.user
+            );
 
-            // SAVE USER DATA
-            await setDoc(doc(db, 'users', user.uid), {
+            console.log("EMAIL SENT SUCCESS");
 
-                name: form.name,
-                email: form.email,
-                collegeId: form.collegeId,
-                department: form.department,
-                year: form.year,
-                phone: form.phone,
-                profileImage: '',
-                role: 'student',
-                uid: user.uid,
-                verified: false
+            // SAVE USER TO FIRESTORE
+            await setDoc(
+                doc(
+                    db,
+                    'users',
+                    userCredential.user.uid
+                ),
+                {
+                    name: form.name,
+                    email: form.email,
+                    role: 'student',
+                    createdAt: new Date()
+                }
+            );
 
-            });
-
-            // FORCE LOGOUT
+            // AUTO LOGOUT
             await signOut(auth);
 
             toast.success(
-                'Verification email sent 📧 Check Inbox/Spam'
+                'Verification email sent 📧'
             );
 
-            setTimeout(() => {
+            navigate('/login');
 
-                navigate('/login');
+        } catch (error) {
 
-            }, 3000);
-
-        } catch (err) {
-
-            console.error(err);
-
-            const messages = {
-
-                'auth/email-already-in-use':
-                    'Email already exists',
-
-                'auth/invalid-email':
-                    'Invalid email address',
-
-                'auth/weak-password':
-                    'Weak password'
-
-            };
+            console.log(error);
 
             toast.error(
-                messages[err.code] || err.message
+                error.message
             );
 
         } finally {
@@ -231,203 +144,140 @@ const Register = () => {
 
     return (
 
-        <div className="min-h-screen gradient-brand flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="min-h-screen bg-gradient-to-br from-blue-800 to-cyan-500 flex items-center justify-center p-4">
 
-            <div className="absolute top-0 left-0 w-96 h-96 bg-cyan-400/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="w-full max-w-lg bg-white/10 backdrop-blur-xl rounded-3xl p-10 border border-white/20"
+            >
 
-            <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-300/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
+                <div className="text-center mb-8">
 
-            <div className="w-full max-w-lg relative">
+                    <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4">
 
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-center mb-6"
-                >
-
-                    <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-xl">
-
-                        <span className="text-blue-700 font-black text-xl">
+                        <span className="text-blue-700 font-black text-3xl">
                             CC
                         </span>
 
                     </div>
 
-                    <h1 className="text-2xl font-black text-white">
+                    <h1 className="text-4xl font-black text-white">
                         Join Campus Connect
                     </h1>
 
-                    <p className="text-blue-200 text-sm">
-                        Create your student account
+                    <p className="text-blue-100 mt-2">
+                        Create your NECN student account
                     </p>
 
-                </motion.div>
+                </div>
 
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="glass-card backdrop-blur-2xl p-7"
+                <form
+                    onSubmit={handleRegister}
+                    className="space-y-5"
                 >
 
-                    <form
-                        onSubmit={handleRegister}
-                        className="space-y-3"
+                    <div className="relative">
+
+                        <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
+
+                        <input
+                            type="text"
+                            placeholder="Full Name"
+                            value={form.name}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    name: e.target.value
+                                })
+                            }
+                            className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none"
+                        />
+
+                    </div>
+
+                    <div className="relative">
+
+                        <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
+
+                        <input
+                            type="email"
+                            placeholder="Email Address"
+                            value={form.email}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    email: e.target.value
+                                })
+                            }
+                            className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none"
+                        />
+
+                    </div>
+
+                    <div className="relative">
+
+                        <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
+
+                        <input
+                            type={showPw ? 'text' : 'password'}
+                            placeholder="Password"
+                            value={form.password}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    password: e.target.value
+                                })
+                            }
+                            className="w-full pl-12 pr-14 py-4 rounded-2xl bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none"
+                        />
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setShowPw(!showPw)
+                            }
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-white"
+                        >
+
+                            {showPw
+                                ? <FiEyeOff />
+                                : <FiEye />
+                            }
+
+                        </button>
+
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-4 rounded-2xl bg-white text-blue-700 font-bold text-lg hover:bg-blue-50 transition-all"
                     >
 
-                        <div className="grid grid-cols-2 gap-3">
+                        {loading
+                            ? 'Creating Account...'
+                            : 'Create Account →'
+                        }
 
-                            <div className="col-span-2">
+                    </button>
 
-                                <Field
-                                    icon={FiUser}
-                                    name="name"
-                                    placeholder="Full Name *"
-                                    value={form.name}
-                                    onChange={set}
-                                />
+                </form>
 
-                            </div>
+                <p className="text-center text-white/70 mt-6">
 
-                            <div className="col-span-2">
+                    Already a member?{' '}
 
-                                <Field
-                                    icon={FiMail}
-                                    name="email"
-                                    type="email"
-                                    placeholder="Email *"
-                                    value={form.email}
-                                    onChange={set}
-                                />
+                    <Link
+                        to="/login"
+                        className="font-bold text-white"
+                    >
+                        Sign In
+                    </Link>
 
-                            </div>
+                </p>
 
-                            <Field
-                                icon={FiHash}
-                                name="collegeId"
-                                placeholder="College ID *"
-                                value={form.collegeId}
-                                onChange={set}
-                            />
-
-                            <Field
-                                icon={FiPhone}
-                                name="phone"
-                                type="tel"
-                                placeholder="Phone Number"
-                                value={form.phone}
-                                onChange={set}
-                            />
-
-                        </div>
-
-                        <select
-                            value={form.department}
-                            onChange={(e) =>
-                                set('department', e.target.value)
-                            }
-                            className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white"
-                        >
-
-                            <option value="">
-                                Select Department *
-                            </option>
-
-                            {departments.map((d) => (
-
-                                <option
-                                    key={d}
-                                    value={d}
-                                >
-                                    {d}
-                                </option>
-
-                            ))}
-
-                        </select>
-
-                        <select
-                            value={form.year}
-                            onChange={(e) =>
-                                set('year', e.target.value)
-                            }
-                            className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white"
-                        >
-
-                            <option value="">
-                                Select Year *
-                            </option>
-
-                            {years.map((y) => (
-
-                                <option
-                                    key={y}
-                                    value={y}
-                                >
-                                    {y}
-                                </option>
-
-                            ))}
-
-                        </select>
-
-                        <Field
-                            icon={FiLock}
-                            name="password"
-                            placeholder="Password *"
-                            value={form.password}
-                            onChange={set}
-                            showPw={showPw}
-                            onTogglePw={() =>
-                                setShowPw((p) => !p)
-                            }
-                        />
-
-                        <Field
-                            icon={FiLock}
-                            name="confirm"
-                            placeholder="Confirm Password *"
-                            value={form.confirm}
-                            onChange={set}
-                            showPw={showPw}
-                            onTogglePw={() =>
-                                setShowPw((p) => !p)
-                            }
-                        />
-
-                        <motion.button
-                            type="submit"
-                            disabled={loading}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="w-full py-3.5 rounded-xl bg-white text-blue-700 font-bold text-sm hover:bg-blue-50 transition-all shadow-lg disabled:opacity-60 mt-2"
-                        >
-
-                            {loading
-                                ? 'Creating Account...'
-                                : 'Create Account →'
-                            }
-
-                        </motion.button>
-
-                    </form>
-
-                    <p className="text-center text-white/50 text-sm mt-5">
-
-                        Already a member?{' '}
-
-                        <Link
-                            to="/login"
-                            className="text-blue-200 hover:text-white font-semibold transition-colors"
-                        >
-                            Sign In
-                        </Link>
-
-                    </p>
-
-                </motion.div>
-
-            </div>
+            </motion.div>
 
         </div>
 
