@@ -1,48 +1,65 @@
-/* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState } from 'react';
-import { auth } from '../firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { createContext, useContext, useEffect, useState } from "react";
 
-const AuthContext = createContext(null);
+import { auth, db } from "../firebase";
+
+import { onAuthStateChanged } from "firebase/auth";
+
+import {
+  collection,
+  getDocs,
+} from "firebase/firestore";
+
+const AuthContext = createContext();
+
+export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-    const [currentUser, setCurrentUser] = useState(null);
-    const [userProfile, setUserProfile] = useState(null);
-    const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            setCurrentUser(user);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-            if (user) {
-                setUserProfile(user);
-            } else {
-                setUserProfile(null);
-            }
+  const [loading, setLoading] = useState(true);
 
-            setLoading(false);
-        });
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
 
-        return unsubscribe;
-    }, []);
+      if (user) {
+        try {
+          const querySnapshot = await getDocs(
+            collection(db, "admins")
+          );
 
-    const value = { currentUser, userProfile, setUserProfile, loading };
+          const adminEmails = querySnapshot.docs.map(
+            (doc) => doc.data().email
+          );
 
-    return (
-        <AuthContext.Provider value={value}>
-            {!loading && children}
-        </AuthContext.Provider>
-    );
+          if (adminEmails.includes(user.email)) {
+            setIsAdmin(true);
+          } else {
+            setIsAdmin(false);
+          }
+        } catch (error) {
+          console.log(error);
+        }
+      } else {
+        setIsAdmin(false);
+      }
+
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const value = {
+    currentUser,
+    isAdmin,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
 };
-
-export const useAuth = () => {
-    const context = useContext(AuthContext);
-
-    if (!context) {
-        throw new Error('useAuth must be used within AuthProvider');
-    }
-
-    return context;
-};
-
-export default AuthContext;

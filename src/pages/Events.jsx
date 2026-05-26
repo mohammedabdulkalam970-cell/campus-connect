@@ -1,135 +1,338 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FiPlus, FiX, FiCalendar } from 'react-icons/fi';
-import { addDoc, collection, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { useAuth } from '../context/AuthContext';
-import useFirestore from '../hooks/useFirestore';
-import { db } from '../firebase';
-import EventCard from '../components/EventCard';
-import SearchBar from '../components/SearchBar';
-import SkeletonLoader from '../components/SkeletonLoader';
-import toast from 'react-hot-toast';
+import { useEffect, useState } from "react";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 
-const categories = ['All', 'Technical', 'Cultural', 'Sports', 'Workshop', 'Seminar'];
+import { db, auth } from "../firebase";
+import { useAuth } from "../context/AuthContext";
 
-const Events = () => {
-    const { userProfile } = useAuth();
-    const { docs: events, loading } = useFirestore('events', [], { field: 'date', direction: 'asc' });
+const categories = [
+  "All",
+  "Technical",
+  "Cultural",
+  "Sports",
+  "Workshop",
+  "Seminar",
+];
 
-    const [search, setSearch] = useState('');
-    const [cat, setCat] = useState('All');
-    const [showAdd, setShowAdd] = useState(false);
-    const [bookmarked, setBookmarked] = useState({});
-    const [form, setForm] = useState({ title: '', description: '', venue: '', date: '', category: 'Technical', registrationLink: '', posterURL: '' });
+export default function Events() {
+  const { isAdmin } = useAuth();
 
-    const filtered = events.filter(e => {
-        const matchSearch = e.title?.toLowerCase().includes(search.toLowerCase()) || e.description?.toLowerCase().includes(search.toLowerCase());
-        const matchCat = cat === 'All' || e.category === cat;
-        return matchSearch && matchCat;
-    });
+  const [events, setEvents] = useState([]);
+  const [filteredEvents, setFilteredEvents] = useState([]);
 
-    const handleAdd = async (ev) => {
-        ev.preventDefault();
-        if (!form.title || !form.date || !form.venue) return toast.error('Fill required fields');
-        try {
-            await addDoc(collection(db, 'events'), {
-                ...form,
-                createdAt: serverTimestamp(),
-            });
-            toast.success('Event created!');
-            setShowAdd(false);
-            setForm({ title: '', description: '', venue: '', date: '', category: 'Technical', registrationLink: '', posterURL: '' });
-        } catch { toast.error('Failed to create event'); }
-    };
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
 
-    const isAdmin = userProfile?.role === 'admin';
+  const [showModal, setShowModal] = useState(false);
 
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100">Events</h1>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">College events & activities</p>
-                </div>
-                {isAdmin && (
-                    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                        onClick={() => setShowAdd(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 gradient-brand text-white rounded-xl text-sm font-semibold shadow-lg">
-                        <FiPlus className="w-4 h-4" /> Add Event
-                    </motion.button>
-                )}
-            </div>
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("Technical");
+  const [date, setDate] = useState("");
+  const [venue, setVenue] = useState("");
 
-            <SearchBar value={search} onChange={setSearch} placeholder="Search events..." />
+  // FETCH EVENTS
+  const fetchEvents = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "events"));
 
-            <div className="flex gap-2 overflow-x-auto pb-1">
-                {categories.map(c => (
-                    <button key={c} onClick={() => setCat(c)}
-                        className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${cat === c ? 'gradient-brand text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
-                        {c}
-                    </button>
-                ))}
-            </div>
+      const eventsData = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-            {loading ? (
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"><SkeletonLoader count={6} /></div>
-            ) : filtered.length === 0 ? (
-                <div className="text-center py-16 text-slate-400">
-                    <FiCalendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <p className="font-medium">No events found</p>
-                </div>
-            ) : (
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <AnimatePresence>
-                        {filtered.map(e => (
-                            <EventCard key={e.id} event={e} bookmarked={bookmarked[e.id]}
-                                onBookmark={id => setBookmarked(p => ({ ...p, [id]: !p[id] }))} />
-                        ))}
-                    </AnimatePresence>
-                </div>
-            )}
+      setEvents(eventsData);
+      setFilteredEvents(eventsData);
+    } catch (error) {
+      console.log(error);
+    }
+  };
 
-            {/* Add event modal (admin) */}
-            <AnimatePresence>
-                {showAdd && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                        onClick={e => e.target === e.currentTarget && setShowAdd(false)}>
-                        <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-                            className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
-                            <div className="flex items-center justify-between mb-5">
-                                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Create Event</h2>
-                                <button onClick={() => setShowAdd(false)} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"><FiX /></button>
-                            </div>
-                            <form onSubmit={handleAdd} className="space-y-3">
-                                {[
-                                    { key: 'title', placeholder: 'Event Title *', type: 'text' },
-                                    { key: 'venue', placeholder: 'Venue *', type: 'text' },
-                                    { key: 'registrationLink', placeholder: 'Registration Link', type: 'url' },
-                                    { key: 'posterURL', placeholder: 'Poster Image URL', type: 'url' },
-                                ].map(f => (
-                                    <input key={f.key} type={f.type} placeholder={f.placeholder} value={form[f.key]}
-                                        onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400/30 text-sm" />
-                                ))}
-                                <textarea placeholder="Description" value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={3}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400/30 text-sm resize-none" />
-                                <div className="grid grid-cols-2 gap-3">
-                                    <input type="datetime-local" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))}
-                                        className="px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400/30 text-sm" />
-                                    <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-                                        className="px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400/30 text-sm">
-                                        {categories.filter(c => c !== 'All').map(c => <option key={c}>{c}</option>)}
-                                    </select>
-                                </div>
-                                <button type="submit" className="w-full py-3 gradient-brand text-white rounded-xl text-sm font-bold hover:opacity-90 transition-all">Create Event</button>
-                            </form>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  // SEARCH + FILTER
+  useEffect(() => {
+    let filtered = events;
+
+    if (selectedCategory !== "All") {
+      filtered = filtered.filter(
+        (event) => event.category === selectedCategory
+      );
+    }
+
+    if (search.trim() !== "") {
+      filtered = filtered.filter((event) =>
+        event.title.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+
+    setFilteredEvents(filtered);
+  }, [search, selectedCategory, events]);
+
+  // ADD EVENT
+  const handleAddEvent = async () => {
+    if (!title || !description || !date || !venue) {
+      alert("Please fill all fields");
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, "events"), {
+        title,
+        description,
+        category,
+        date,
+        venue,
+        createdBy: auth.currentUser?.email || "Unknown",
+      });
+
+      alert("Event Added Successfully");
+
+      setShowModal(false);
+
+      setTitle("");
+      setDescription("");
+      setCategory("Technical");
+      setDate("");
+      setVenue("");
+
+      fetchEvents();
+    } catch (error) {
+      console.log(error);
+      alert("Failed to add event");
+    }
+  };
+
+  // DELETE EVENT
+  const handleDelete = async (id) => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this event?"
     );
-};
 
-export default Events;
+    if (!confirmDelete) return;
+
+    try {
+      await deleteDoc(doc(db, "events", id));
+
+      alert("Event deleted");
+
+      fetchEvents();
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#020617] text-white p-6">
+
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-8">
+
+        <div>
+          <h1 className="text-5xl font-black bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
+            Events
+          </h1>
+
+          <p className="text-gray-400 mt-3 text-lg">
+            College events & activities
+          </p>
+        </div>
+
+        {/* ADMIN ONLY */}
+        {isAdmin && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:scale-105 transition-all duration-300 px-6 py-3 rounded-2xl font-bold"
+          >
+            + Add Event
+          </button>
+        )}
+      </div>
+
+      {/* SEARCH */}
+      <input
+        type="text"
+        placeholder="Search events..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-full bg-[#0f172a] border border-cyan-500/10 rounded-2xl px-5 py-4 mb-8 outline-none"
+      />
+
+      {/* FILTERS */}
+      <div className="flex gap-3 flex-wrap mb-10">
+
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setSelectedCategory(cat)}
+            className={`px-5 py-2 rounded-full font-semibold ${
+              selectedCategory === cat
+                ? "bg-gradient-to-r from-blue-600 to-cyan-500"
+                : "bg-[#1e293b]"
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+
+      </div>
+
+      {/* EVENTS */}
+      {filteredEvents.length === 0 ? (
+
+        <div className="text-center mt-32">
+          <h2 className="text-3xl font-bold text-gray-500">
+            No events found
+          </h2>
+        </div>
+
+      ) : (
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+          {filteredEvents.map((event) => (
+
+            <div
+              key={event.id}
+              className="bg-[#0f172a] border border-cyan-500/10 rounded-3xl p-6 relative"
+            >
+
+              {/* DELETE BUTTON */}
+              {isAdmin && (
+                <button
+                  onClick={() => handleDelete(event.id)}
+                  className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 px-3 py-1 rounded-lg"
+                >
+                  Delete
+                </button>
+              )}
+
+              {/* ADMIN BADGE */}
+              {event.createdBy === "admin@necn.ac.in" && (
+                <div className="mb-4 inline-block bg-yellow-400 text-black text-xs font-bold px-4 py-1 rounded-full">
+                  ADMIN EVENT
+                </div>
+              )}
+
+              <h2 className="text-3xl font-black mb-3">
+                {event.title}
+              </h2>
+
+              <p className="text-gray-400 mb-5">
+                {event.description}
+              </p>
+
+              <div className="mb-4">
+                <span className="bg-blue-600 px-4 py-1 rounded-full text-sm">
+                  {event.category}
+                </span>
+              </div>
+
+              <p className="mb-2">📅 {event.date}</p>
+
+              <p className="mb-4">📍 {event.venue}</p>
+
+              <p className="text-xs text-gray-500">
+                Posted by: {event.createdBy}
+              </p>
+
+            </div>
+
+          ))}
+
+        </div>
+
+      )}
+
+      {/* MODAL */}
+      {showModal && (
+
+        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-50 p-4">
+
+          <div className="bg-[#0f172a] p-8 rounded-3xl w-full max-w-xl">
+
+            <h2 className="text-4xl font-black mb-8">
+              Add Event
+            </h2>
+
+            <div className="space-y-4">
+
+              <input
+                type="text"
+                placeholder="Event title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full bg-[#1e293b] p-4 rounded-xl outline-none"
+              />
+
+              <textarea
+                placeholder="Description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full bg-[#1e293b] p-4 rounded-xl outline-none h-32"
+              />
+
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full bg-[#1e293b] p-4 rounded-xl outline-none"
+              >
+                <option>Technical</option>
+                <option>Cultural</option>
+                <option>Sports</option>
+                <option>Workshop</option>
+                <option>Seminar</option>
+              </select>
+
+              <input
+                type="text"
+                placeholder="Date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full bg-[#1e293b] p-4 rounded-xl outline-none"
+              />
+
+              <input
+                type="text"
+                placeholder="Venue"
+                value={venue}
+                onChange={(e) => setVenue(e.target.value)}
+                className="w-full bg-[#1e293b] p-4 rounded-xl outline-none"
+              />
+
+              <div className="flex gap-4 pt-4">
+
+                <button
+                  onClick={handleAddEvent}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 py-4 rounded-xl font-bold"
+                >
+                  Add Event
+                </button>
+
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 py-4 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
+    </div>
+  );
+}
