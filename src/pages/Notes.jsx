@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiUpload, FiX } from 'react-icons/fi';
+import { FiUpload, FiX, FiTrash2 } from 'react-icons/fi';
 import { useDropzone } from 'react-dropzone';
 
 import {
   addDoc,
   collection,
-  serverTimestamp
+  serverTimestamp,
+  deleteDoc,
+  doc
 } from 'firebase/firestore';
 
 import { useAuth } from '../context/AuthContext';
@@ -117,13 +119,30 @@ const Notes = () => {
 
     const uploadedData = await response.json();
 
-    console.log(uploadedData);
-
     if (!uploadedData.secure_url) {
       throw new Error('Cloudinary upload failed');
     }
 
     return uploadedData.secure_url;
+  };
+
+  // DELETE NOTE
+  const handleDelete = async (id) => {
+
+    try {
+
+      await deleteDoc(doc(db, 'notes', id));
+
+      toast.success('Note deleted successfully');
+
+    } catch (error) {
+
+      console.log(error);
+
+      toast.error('Delete failed');
+
+    }
+
   };
 
   // HANDLE NOTE UPLOAD
@@ -148,11 +167,9 @@ const Notes = () => {
 
       setUploading(true);
 
-      // UPLOAD FILE TO CLOUDINARY
       const fileURL =
         await uploadToCloudinary(file);
 
-      // SAVE TO FIRESTORE
       await addDoc(
         collection(db, 'notes'),
         {
@@ -163,6 +180,8 @@ const Notes = () => {
           fileName: file.name,
 
           uploadedBy: currentUser?.uid,
+
+          uploaderEmail: currentUser?.email,
 
           uploaderName:
             userProfile?.name || 'Student',
@@ -323,10 +342,27 @@ const Notes = () => {
 
           {filteredNotes.map(note => (
 
-            <NoteCard
+            <div
               key={note.id}
-              note={note}
-            />
+              className="relative"
+            >
+
+              <NoteCard note={note} />
+
+              {note.uploaderEmail === currentUser?.email && (
+
+                <button
+                  onClick={() => handleDelete(note.id)}
+                  className="absolute top-3 right-3 p-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition"
+                >
+
+                  <FiTrash2 />
+
+                </button>
+
+              )}
+
+            </div>
 
           ))}
 
