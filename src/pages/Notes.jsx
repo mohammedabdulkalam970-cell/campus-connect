@@ -46,7 +46,7 @@ const semesters = [
 
 const Notes = () => {
 
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser, userProfile, isAdmin } = useAuth();
 
   const {
     docs: notes,
@@ -349,7 +349,7 @@ const Notes = () => {
 
               <NoteCard note={note} />
 
-              {note.uploaderEmail === currentUser?.email && (
+              {(note.uploaderEmail === currentUser?.email || isAdmin) && (
 
                 <button
                   onClick={() => handleDelete(note.id)}

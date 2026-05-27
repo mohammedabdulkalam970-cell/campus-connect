@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { FiDownload, FiHeart, FiBookmark, FiEye, FiFile, FiImage } from 'react-icons/fi';
 import { format } from 'date-fns';
+import { useAuth } from '../context/AuthContext';
 
 const fileIcons = {
     pdf: { icon: FiFile, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20' },
@@ -10,6 +11,7 @@ const fileIcons = {
 };
 
 const NoteCard = ({ note, onPreview, onLike, onSave, liked, saved }) => {
+    const { isAdmin } = useAuth();
     const fileType = note.fileType?.toLowerCase() || 'default';
     const iconData = fileIcons[fileType] || fileIcons.default;
     const Icon = iconData.icon;
@@ -31,7 +33,14 @@ const NoteCard = ({ note, onPreview, onLike, onSave, liked, saved }) => {
                     <Icon className={`w-5 h-5 ${iconData.color}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm leading-snug truncate">{note.title}</h3>
+                    <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm leading-snug truncate">{note.title}</h3>
+                        {isAdmin && (
+                          <span className="text-xs bg-red-500 text-white px-2 py-1 rounded-full">
+                            ADMIN
+                          </span>
+                        )}
+                    </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{note.subject}</p>
                 </div>
             </div>
