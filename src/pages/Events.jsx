@@ -1,14 +1,8 @@
 import { useEffect, useState } from "react";
-import {
-  collection,
-  addDoc,
-  getDocs,
-  deleteDoc,
-  doc,
-} from "firebase/firestore";
-
-import { db, auth } from "../firebase";
+import { collection, addDoc, deleteDoc, doc, onSnapshot } from "firebase/firestore";
+import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
+import toast from "react-hot-toast";
 
 const categories = [
   "All",
@@ -19,137 +13,115 @@ const categories = [
   "Seminar",
 ];
 
-export default function Events() {
-  const { isAdmin } = useAuth();
+const Events = () => {
+  const { userProfile, currentUser } = useAuth();
 
   const [events, setEvents] = useState([]);
-  const [filteredEvents, setFilteredEvents] = useState([]);
-
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
 
   const [showModal, setShowModal] = useState(false);
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Technical");
-  const [date, setDate] = useState("");
-  const [venue, setVenue] = useState("");
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    category: "Technical",
+    date: "",
+    venue: "",
+  });
+
+  const isAdmin = userProfile?.role === "admin";
 
   // FETCH EVENTS
-  const fetchEvents = async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, "events"));
-
-      const eventsData = querySnapshot.docs.map((doc) => ({
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "events"), (snapshot) => {
+      const data = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
 
-      setEvents(eventsData);
-      setFilteredEvents(eventsData);
-    } catch (error) {
-      console.log(error);
-    }
-  };
+      setEvents(data);
+    });
 
-  useEffect(() => {
-    fetchEvents();
+    return () => unsub();
   }, []);
-
-  // SEARCH + FILTER
-  useEffect(() => {
-    let filtered = events;
-
-    if (selectedCategory !== "All") {
-      filtered = filtered.filter(
-        (event) => event.category === selectedCategory
-      );
-    }
-
-    if (search.trim() !== "") {
-      filtered = filtered.filter((event) =>
-        event.title.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    setFilteredEvents(filtered);
-  }, [search, selectedCategory, events]);
 
   // ADD EVENT
   const handleAddEvent = async () => {
-    if (!title || !description || !date || !venue) {
-      alert("Please fill all fields");
+    if (
+      !form.title ||
+      !form.description ||
+      !form.date ||
+      !form.venue
+    ) {
+      toast.error("Fill all fields");
       return;
     }
 
     try {
       await addDoc(collection(db, "events"), {
-        title,
-        description,
-        category,
-        date,
-        venue,
-        createdBy: auth.currentUser?.email || "Unknown",
+        ...form,
+        createdBy: currentUser.email,
       });
 
-      alert("Event Added Successfully");
+      toast.success("Event added");
+
+      setForm({
+        title: "",
+        description: "",
+        category: "Technical",
+        date: "",
+        venue: "",
+      });
 
       setShowModal(false);
-
-      setTitle("");
-      setDescription("");
-      setCategory("Technical");
-      setDate("");
-      setVenue("");
-
-      fetchEvents();
     } catch (error) {
-      console.log(error);
-      alert("Failed to add event");
+      toast.error("Failed to add event");
     }
   };
 
   // DELETE EVENT
   const handleDelete = async (id) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this event?"
-    );
-
-    if (!confirmDelete) return;
-
     try {
       await deleteDoc(doc(db, "events", id));
-
-      alert("Event deleted");
-
-      fetchEvents();
+      toast.success("Event deleted");
     } catch (error) {
-      console.log(error);
+      toast.error("Delete failed");
     }
   };
 
+  // FILTER EVENTS
+  const filteredEvents = events.filter((event) => {
+    const matchesSearch =
+      event.title?.toLowerCase().includes(search.toLowerCase()) ||
+      event.description?.toLowerCase().includes(search.toLowerCase());
+
+    const matchesCategory =
+      selectedCategory === "All" ||
+      event.category === selectedCategory;
+
+    return matchesSearch && matchesCategory;
+  });
+
   return (
-    <div className="min-h-screen bg-[#020617] text-white p-6">
-
+    <div className="p-6 text-white min-h-screen bg-[#020817]">
       {/* HEADER */}
-      <div className="flex justify-between items-center mb-8">
-
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-5xl font-black bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
+          <h1 className="text-5xl font-black text-blue-400 mb-2">
             Events
           </h1>
 
-          <p className="text-gray-400 mt-3 text-lg">
+          <p className="text-gray-400 text-lg">
             College events & activities
           </p>
         </div>
 
-        {/* ADMIN ONLY */}
+        {/* ADMIN BUTTON */}
         {isAdmin && (
           <button
             onClick={() => setShowModal(true)}
-            className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:scale-105 transition-all duration-300 px-6 py-3 rounded-2xl font-bold"
+            className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-400 font-bold text-lg hover:scale-105 transition"
           >
             + Add Event
           </button>
@@ -162,127 +134,114 @@ export default function Events() {
         placeholder="Search events..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full bg-[#0f172a] border border-cyan-500/10 rounded-2xl px-5 py-4 mb-8 outline-none"
+        className="w-full mb-6 p-4 rounded-2xl bg-[#0f172a] border border-slate-700 outline-none"
       />
 
-      {/* FILTERS */}
-      <div className="flex gap-3 flex-wrap mb-10">
-
+      {/* CATEGORY FILTER */}
+      <div className="flex flex-wrap gap-3 mb-8">
         {categories.map((cat) => (
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
-            className={`px-5 py-2 rounded-full font-semibold ${
+            className={`px-5 py-2 rounded-full font-semibold transition ${
               selectedCategory === cat
-                ? "bg-gradient-to-r from-blue-600 to-cyan-500"
-                : "bg-[#1e293b]"
+                ? "bg-blue-500 text-white"
+                : "bg-slate-800 text-gray-300"
             }`}
           >
             {cat}
           </button>
         ))}
-
       </div>
 
-      {/* EVENTS */}
-      {filteredEvents.length === 0 ? (
+      {/* EVENTS GRID */}
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredEvents.map((event) => (
+          <div
+            key={event.id}
+            className="bg-[#0f172a] border border-slate-700 rounded-3xl p-6 relative shadow-xl"
+          >
+            {/* DELETE BUTTON */}
+            {isAdmin && (
+              <button
+                onClick={() => handleDelete(event.id)}
+                className="absolute top-4 right-4 bg-red-500 px-3 py-1 rounded-xl text-sm font-bold"
+              >
+                Delete
+              </button>
+            )}
 
-        <div className="text-center mt-32">
-          <h2 className="text-3xl font-bold text-gray-500">
-            No events found
-          </h2>
-        </div>
+            <h2 className="text-4xl font-black mb-3">
+              {event.title}
+            </h2>
 
-      ) : (
+            <p className="text-gray-400 mb-5">
+              {event.description}
+            </p>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <span className="inline-block px-4 py-2 bg-blue-600 rounded-full text-sm font-bold mb-4">
+              {event.category}
+            </span>
 
-          {filteredEvents.map((event) => (
-
-            <div
-              key={event.id}
-              className="bg-[#0f172a] border border-cyan-500/10 rounded-3xl p-6 relative"
-            >
-
-              {/* DELETE BUTTON */}
-              {isAdmin && (
-                <button
-                  onClick={() => handleDelete(event.id)}
-                  className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 px-3 py-1 rounded-lg"
-                >
-                  Delete
-                </button>
-              )}
-
-              {/* ADMIN BADGE */}
-              {event.createdBy === "admin@necn.ac.in" && (
-                <div className="mb-4 inline-block bg-yellow-400 text-black text-xs font-bold px-4 py-1 rounded-full">
-                  ADMIN EVENT
-                </div>
-              )}
-
-              <h2 className="text-3xl font-black mb-3">
-                {event.title}
-              </h2>
-
-              <p className="text-gray-400 mb-5">
-                {event.description}
-              </p>
-
-              <div className="mb-4">
-                <span className="bg-blue-600 px-4 py-1 rounded-full text-sm">
-                  {event.category}
-                </span>
-              </div>
-
-              <p className="mb-2">📅 {event.date}</p>
-
-              <p className="mb-4">📍 {event.venue}</p>
-
-              <p className="text-xs text-gray-500">
-                Posted by: {event.createdBy}
-              </p>
-
+            <div className="space-y-2 text-lg">
+              <p>📅 {event.date}</p>
+              <p>📍 {event.venue}</p>
             </div>
 
-          ))}
+            <p className="mt-6 text-sm text-gray-500">
+              Posted by: {event.createdBy}
+            </p>
+          </div>
+        ))}
+      </div>
 
+      {/* EMPTY */}
+      {filteredEvents.length === 0 && (
+        <div className="text-center text-gray-500 mt-20 text-2xl">
+          No events found
         </div>
-
       )}
 
-      {/* MODAL */}
+      {/* ADD EVENT MODAL */}
       {showModal && (
-
-        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-50 p-4">
-
-          <div className="bg-[#0f172a] p-8 rounded-3xl w-full max-w-xl">
-
-            <h2 className="text-4xl font-black mb-8">
-              Add Event
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-[#0f172a] p-8 rounded-3xl w-full max-w-lg border border-slate-700">
+            <h2 className="text-3xl font-black mb-6">
+              Add New Event
             </h2>
 
             <div className="space-y-4">
-
               <input
                 type="text"
                 placeholder="Event title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full bg-[#1e293b] p-4 rounded-xl outline-none"
+                value={form.title}
+                onChange={(e) =>
+                  setForm({ ...form, title: e.target.value })
+                }
+                className="w-full p-4 rounded-xl bg-[#020817] border border-slate-700"
               />
 
               <textarea
                 placeholder="Description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full bg-[#1e293b] p-4 rounded-xl outline-none h-32"
+                value={form.description}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    description: e.target.value,
+                  })
+                }
+                className="w-full p-4 rounded-xl bg-[#020817] border border-slate-700"
               />
 
               <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-[#1e293b] p-4 rounded-xl outline-none"
+                value={form.category}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    category: e.target.value,
+                  })
+                }
+                className="w-full p-4 rounded-xl bg-[#020817] border border-slate-700"
               >
                 <option>Technical</option>
                 <option>Cultural</option>
@@ -294,45 +253,44 @@ export default function Events() {
               <input
                 type="text"
                 placeholder="Date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-[#1e293b] p-4 rounded-xl outline-none"
+                value={form.date}
+                onChange={(e) =>
+                  setForm({ ...form, date: e.target.value })
+                }
+                className="w-full p-4 rounded-xl bg-[#020817] border border-slate-700"
               />
 
               <input
                 type="text"
                 placeholder="Venue"
-                value={venue}
-                onChange={(e) => setVenue(e.target.value)}
-                className="w-full bg-[#1e293b] p-4 rounded-xl outline-none"
+                value={form.venue}
+                onChange={(e) =>
+                  setForm({ ...form, venue: e.target.value })
+                }
+                className="w-full p-4 rounded-xl bg-[#020817] border border-slate-700"
               />
-
-              <div className="flex gap-4 pt-4">
-
-                <button
-                  onClick={handleAddEvent}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 py-4 rounded-xl font-bold"
-                >
-                  Add Event
-                </button>
-
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 py-4 rounded-xl font-bold"
-                >
-                  Cancel
-                </button>
-
-              </div>
-
             </div>
 
+            <div className="flex gap-4 mt-8">
+              <button
+                onClick={handleAddEvent}
+                className="flex-1 py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-400 font-bold"
+              >
+                Add Event
+              </button>
+
+              <button
+                onClick={() => setShowModal(false)}
+                className="flex-1 py-4 rounded-2xl bg-slate-700 font-bold"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-
         </div>
-
       )}
-
     </div>
   );
-}
+};
+
+export default Events;

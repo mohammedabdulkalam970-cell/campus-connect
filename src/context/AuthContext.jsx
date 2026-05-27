@@ -1,65 +1,113 @@
-import { createContext, useContext, useEffect, useState } from "react";
-
-import { auth, db } from "../firebase";
-
-import { onAuthStateChanged } from "firebase/auth";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 
 import {
-  collection,
-  getDocs,
+  onAuthStateChanged,
+} from "firebase/auth";
+
+import {
+  doc,
+  getDoc,
 } from "firebase/firestore";
+
+import {
+  auth,
+  db,
+} from "../firebase";
 
 const AuthContext = createContext();
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () =>
+  useContext(AuthContext);
 
-export const AuthProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(null);
+export const AuthProvider = ({
+  children,
+}) => {
 
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUser, setCurrentUser] =
+    useState(null);
 
-  const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] =
+    useState(null);
+
+  const [loading, setLoading] =
+    useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
 
-      if (user) {
-        try {
-          const querySnapshot = await getDocs(
-            collection(db, "admins")
-          );
+    const unsubscribe =
+      onAuthStateChanged(
+        auth,
+        async (user) => {
 
-          const adminEmails = querySnapshot.docs.map(
-            (doc) => doc.data().email
-          );
+          setCurrentUser(user);
 
-          if (adminEmails.includes(user.email)) {
-            setIsAdmin(true);
+          if (user) {
+
+            try {
+
+              const docRef =
+                doc(
+                  db,
+                  "users",
+                  user.uid
+                );
+
+              const docSnap =
+                await getDoc(docRef);
+
+              if (docSnap.exists()) {
+
+                setUserProfile(
+                  docSnap.data()
+                );
+
+              }
+
+            } catch (error) {
+
+              console.log(error);
+
+            }
+
           } else {
-            setIsAdmin(false);
-          }
-        } catch (error) {
-          console.log(error);
-        }
-      } else {
-        setIsAdmin(false);
-      }
 
-      setLoading(false);
-    });
+            setUserProfile(null);
+
+          }
+
+          setLoading(false);
+
+        }
+      );
 
     return unsubscribe;
+
   }, []);
 
   const value = {
+
     currentUser,
-    isAdmin,
+    userProfile,
+    setUserProfile,
+
+    isAdmin:
+      userProfile?.role === "admin",
+
   };
 
   return (
+
     <AuthContext.Provider value={value}>
+
       {!loading && children}
+
     </AuthContext.Provider>
+
   );
+
 };
