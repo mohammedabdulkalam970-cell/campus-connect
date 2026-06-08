@@ -13,6 +13,7 @@ import Events from "../pages/Events";
 import LostFound from "../pages/LostFound";
 import Chat from "../pages/Chat";
 import Profile from "../pages/Profile";
+import Announcements from "../pages/Announcements";
 
 import Admin from "../pages/Admin";
 
@@ -83,6 +84,8 @@ const AppRoutes = () => {
         <Route path="/lost-found" element={<LostFound />} />
 
         <Route path="/chat" element={<Chat />} />
+
+        <Route path="/announcements" element={<Announcements />} />
 
         <Route path="/profile" element={<Profile />} />
       </Route>

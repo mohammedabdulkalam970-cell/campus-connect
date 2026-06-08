@@ -13,7 +13,8 @@ import {
     FiMenu,
     FiX,
     FiSun,
-    FiMoon
+    FiMoon,
+    FiBell
 } from 'react-icons/fi';
 
 import { auth } from "../firebase";
@@ -25,6 +26,7 @@ import toast from 'react-hot-toast';
 
 const navItems = [
     { to: '/dashboard', icon: FiHome, label: 'Dashboard' },
+    { to: '/announcements', icon: FiBell, label: 'Announcements' },
     { to: '/notes', icon: FiBook, label: 'Notes' },
     { to: '/events', icon: FiCalendar, label: 'Events' },
     { to: '/lost-found', icon: FiSearch, label: 'Lost & Found' },
