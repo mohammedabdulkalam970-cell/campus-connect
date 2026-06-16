@@ -14,6 +14,8 @@ import LostFound from "../pages/LostFound";
 import Chat from "../pages/Chat";
 import Profile from "../pages/Profile";
 import Announcements from "../pages/Announcements";
+import AIStudyAssistant from "../pages/AIStudyAssistant";
+import Placements from "../pages/Placements";
 
 import Admin from "../pages/Admin";
 
@@ -88,6 +90,10 @@ const AppRoutes = () => {
         <Route path="/announcements" element={<Announcements />} />
 
         <Route path="/profile" element={<Profile />} />
+
+        <Route path="/ai-assistant" element={<AIStudyAssistant />} />
+
+        <Route path="/placements" element={<Placements />} />
       </Route>
 
       {/* Admin Route */}

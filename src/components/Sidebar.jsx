@@ -14,7 +14,9 @@ import {
     FiX,
     FiSun,
     FiMoon,
-    FiBell
+    FiBell,
+    FiZap,
+    FiBriefcase
 } from 'react-icons/fi';
 
 import { auth } from "../firebase";
@@ -29,6 +31,8 @@ const navItems = [
     { to: '/announcements', icon: FiBell, label: 'Announcements' },
     { to: '/notes', icon: FiBook, label: 'Notes' },
     { to: '/events', icon: FiCalendar, label: 'Events' },
+    { to: '/placements', icon: FiBriefcase, label: 'Placements' },
+    { to: '/ai-assistant', icon: FiZap, label: 'AI Assistant', highlight: true },
     { to: '/lost-found', icon: FiSearch, label: 'Lost & Found' },
     { to: '/chat', icon: FiMessageSquare, label: 'Chat' },
     { to: '/profile', icon: FiUser, label: 'Profile' },
@@ -80,17 +84,21 @@ const Sidebar = () => {
 
             <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
 
-                {navItems.map(({ to, icon: Icon, label }) => (
+                {navItems.map(({ to, icon: Icon, label, highlight }) => (
 
                     <NavLink
                         key={to}
                         to={to}
                         onClick={() => isMobile && setMobileOpen(false)}
                         className={({ isActive }) =>
-                            `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group
+                            `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative
                             ${isActive
-                                ? 'bg-white/20 text-white font-semibold shadow-lg'
-                                : 'text-blue-200 hover:bg-white/10 hover:text-white'}
+                                ? highlight
+                                    ? 'bg-gradient-to-r from-violet-600/40 to-purple-600/40 text-white font-semibold shadow-lg border border-violet-500/30'
+                                    : 'bg-white/20 text-white font-semibold shadow-lg'
+                                : highlight
+                                    ? 'text-violet-300 hover:bg-violet-500/20 hover:text-white'
+                                    : 'text-blue-200 hover:bg-white/10 hover:text-white'}
                             ${collapsed && !isMobile ? 'justify-center' : ''}`
                         }
                     >
@@ -98,8 +106,11 @@ const Sidebar = () => {
                         <Icon className="w-4 h-4 flex-shrink-0 group-hover:scale-110 transition-transform" />
 
                         {(!collapsed || isMobile) && (
-                            <span className="text-sm">
+                            <span className="text-sm flex items-center gap-2">
                                 {label}
+                                {highlight && (
+                                    <span className="text-[9px] bg-violet-500 text-white px-1.5 py-0.5 rounded-full font-bold leading-none">AI</span>
+                                )}
                             </span>
                         )}
 
