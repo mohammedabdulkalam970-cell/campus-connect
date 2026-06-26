@@ -7,6 +7,7 @@ import useFirestore from '../hooks/useFirestore';
 import NoteCard from '../components/NoteCard';
 import EventCard from '../components/EventCard';
 import SkeletonLoader from '../components/SkeletonLoader';
+import AttendanceCard from '../components/AttendanceCard';
 
 const stats = [
     { label: 'Notes Shared', icon: FiBook, value: '1,240', color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' },
@@ -96,42 +97,50 @@ const Dashboard = () => {
                 </motion.div>
             </div>
 
-            {/* Recent Notes + Upcoming Events */}
-            <div className="grid lg:grid-cols-2 gap-6">
-                <div>
-                    <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                            <FiBook className="w-4 h-4 text-blue-500" /> Recent Notes
-                        </h2>
-                        <Link to="/notes" className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">View All</Link>
+            {/* Main content grid */}
+            <div className="grid lg:grid-cols-3 gap-6">
+                {/* Left side: Notes & Events */}
+                <div className="lg:col-span-2 space-y-6">
+                    <div>
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <FiBook className="w-4 h-4 text-blue-500" /> Recent Notes
+                            </h2>
+                            <Link to="/notes" className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">View All</Link>
+                        </div>
+                        <div className="space-y-3">
+                            {notesLoading ? (
+                                <SkeletonLoader count={2} />
+                            ) : notes.length === 0 ? (
+                                <p className="text-slate-400 text-sm text-center py-6">No notes yet. Be the first to share!</p>
+                            ) : (
+                                notes.slice(0, 2).map(n => <NoteCard key={n.id} note={n} />)
+                            )}
+                        </div>
                     </div>
-                    <div className="space-y-3">
-                        {notesLoading ? (
-                            <SkeletonLoader count={2} />
-                        ) : notes.length === 0 ? (
-                            <p className="text-slate-400 text-sm text-center py-6">No notes yet. Be the first to share!</p>
-                        ) : (
-                            notes.slice(0, 2).map(n => <NoteCard key={n.id} note={n} />)
-                        )}
+
+                    <div>
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <FiCalendar className="w-4 h-4 text-purple-500" /> Upcoming Events
+                            </h2>
+                            <Link to="/events" className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">View All</Link>
+                        </div>
+                        <div className="space-y-3">
+                            {eventsLoading ? (
+                                <SkeletonLoader count={2} />
+                            ) : events.length === 0 ? (
+                                <p className="text-slate-400 text-sm text-center py-6">No events scheduled.</p>
+                            ) : (
+                                events.slice(0, 2).map(e => <EventCard key={e.id} event={e} />)
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                <div>
-                    <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                            <FiCalendar className="w-4 h-4 text-purple-500" /> Upcoming Events
-                        </h2>
-                        <Link to="/events" className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">View All</Link>
-                    </div>
-                    <div className="space-y-3">
-                        {eventsLoading ? (
-                            <SkeletonLoader count={2} />
-                        ) : events.length === 0 ? (
-                            <p className="text-slate-400 text-sm text-center py-6">No events scheduled.</p>
-                        ) : (
-                            events.slice(0, 2).map(e => <EventCard key={e.id} event={e} />)
-                        )}
-                    </div>
+                {/* Right side: Attendance Widget */}
+                <div className="lg:col-span-1">
+                    <AttendanceCard />
                 </div>
             </div>
         </div>
