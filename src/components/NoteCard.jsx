@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { FiDownload, FiHeart, FiBookmark, FiEye, FiFile, FiImage } from 'react-icons/fi';
 import { format } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 const fileIcons = {
     pdf: { icon: FiFile, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20' },
@@ -17,6 +18,38 @@ const NoteCard = ({ note, onPreview, onLike, onSave, liked, saved }) => {
     const Icon = iconData.icon;
 
     const date = note.createdAt?.toDate ? format(note.createdAt.toDate(), 'MMM d, yyyy') : 'Recently';
+
+    // Force real download — works for Cloudinary and any CORS-enabled URL
+    const handleDownload = async () => {
+        if (!note.fileURL) return toast.error('No file available');
+        try {
+            // Cloudinary supports ?fl_attachment to force download
+            let url = note.fileURL;
+            if (url.includes('cloudinary.com')) {
+                // Insert fl_attachment flag into the Cloudinary URL
+                url = url.replace('/upload/', '/upload/fl_attachment/');
+            }
+
+            const toastId = toast.loading('Downloading...');
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Download failed');
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = note.fileName || note.title || 'note';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+            toast.success('Download started!', { id: toastId });
+        } catch (err) {
+            console.error(err);
+            // Fallback: open in new tab
+            window.open(note.fileURL, '_blank');
+            toast.error('Direct download failed — opened in new tab instead');
+        }
+    };
 
     return (
         <motion.div
@@ -85,15 +118,13 @@ const NoteCard = ({ note, onPreview, onLike, onSave, liked, saved }) => {
                     >
                         <FiBookmark className="w-4 h-4" fill={saved ? 'currentColor' : 'none'} />
                     </button>
-                    <a
-                        href={note.fileURL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download
+                    <button
+                        onClick={handleDownload}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                        title="Download"
                     >
                         <FiDownload className="w-4 h-4" />
-                    </a>
+                    </button>
                 </div>
             </div>
         </motion.div>
@@ -101,3 +132,4 @@ const NoteCard = ({ note, onPreview, onLike, onSave, liked, saved }) => {
 };
 
 export default NoteCard;
+
