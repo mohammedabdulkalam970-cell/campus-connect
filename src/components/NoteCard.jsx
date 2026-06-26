@@ -19,34 +19,44 @@ const NoteCard = ({ note, onPreview, onLike, onSave, liked, saved }) => {
 
     const date = note.createdAt?.toDate ? format(note.createdAt.toDate(), 'MMM d, yyyy') : 'Recently';
 
-    // Force real download — works for Cloudinary and any CORS-enabled URL
-    const handleDownload = async () => {
+    // Force real download using Cloudinary's fl_attachment transformation
+    const handleDownload = () => {
         if (!note.fileURL) return toast.error('No file available');
+        
         try {
-            // Cloudinary supports ?fl_attachment to force download
             let url = note.fileURL;
+            
+            // Extract and clean the filename (remove extension and replace special characters)
+            const baseName = (note.fileName || note.title || 'note')
+                .replace(/\.[^/.]+$/, "") // strip extension if present
+                .replace(/[^a-zA-Z0-9_-]/g, '_'); // sanitize special characters
+
             if (url.includes('cloudinary.com')) {
-                // Insert fl_attachment flag into the Cloudinary URL
-                url = url.replace('/upload/', '/upload/fl_attachment/');
+                // Ensure we use the delivery domain res.cloudinary.com
+                if (url.includes('api.cloudinary.com')) {
+                    url = url.replace('api.cloudinary.com/v1_1/', 'res.cloudinary.com/');
+                }
+                // Add the attachment transformation with custom filename
+                url = url.replace('/upload/', `/upload/fl_attachment:${baseName}/`);
             }
 
-            const toastId = toast.loading('Downloading...');
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Download failed');
-            const blob = await response.blob();
-            const blobUrl = URL.createObjectURL(blob);
+            // Create temporary anchor to trigger browser download
             const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = note.fileName || note.title || 'note';
+            a.href = url;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            URL.revokeObjectURL(blobUrl);
-            toast.success('Download started!', { id: toastId });
+            
+            toast.success('Download started!');
         } catch (err) {
             console.error(err);
-            // Fallback: open in new tab
-            window.open(note.fileURL, '_blank');
+            // Fallback: open attachment URL directly
+            const fallbackUrl = note.fileURL.includes('cloudinary.com')
+                ? note.fileURL.replace('/upload/', '/upload/fl_attachment/')
+                : note.fileURL;
+            window.open(fallbackUrl, '_blank');
             toast.error('Direct download failed — opened in new tab instead');
         }
     };

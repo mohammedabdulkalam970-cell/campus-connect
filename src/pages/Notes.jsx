@@ -110,7 +110,7 @@ const Notes = () => {
     );
 
     const response = await fetch(
-      'https://api.cloudinary.com/v1_1/dpredkdvg/raw/upload',
+      'https://api.cloudinary.com/v1_1/dpredkdvg/auto/upload',
       {
         method: 'POST',
         body: data
@@ -170,6 +170,17 @@ const Notes = () => {
       const fileURL =
         await uploadToCloudinary(file);
 
+      // Extract file type/extension for UI styling
+      const fileExt = file.name.split('.').pop().toLowerCase();
+      let fileType = 'default';
+      if (fileExt === 'pdf') {
+        fileType = 'pdf';
+      } else if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(fileExt)) {
+        fileType = 'image';
+      } else if (['doc', 'docx', 'txt', 'rtf'].includes(fileExt)) {
+        fileType = 'doc';
+      }
+
       await addDoc(
         collection(db, 'notes'),
         {
@@ -178,6 +189,7 @@ const Notes = () => {
           fileURL,
 
           fileName: file.name,
+          fileType,
 
           uploadedBy: currentUser?.uid,
 
